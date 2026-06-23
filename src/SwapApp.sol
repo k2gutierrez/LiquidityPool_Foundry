@@ -60,42 +60,40 @@ contract SwapApp {
         uint _amountAMin,
         uint _amountBMin,
         uint _deadline
-    ) external returns(uint256) {
-        // Transfer total USDT from user
+    ) external returns (uint256) {
+
         IERC20(USDT).safeTransferFrom(msg.sender, address(this), _amountIn);
 
         uint256 half = _amountIn / 2;
         uint256 fee = (half * getFeeBasisPoints()) / getPercentageBasis();
-        uint256 netSwapAmount = half - fee;
+        uint256 netSwap = half - fee;          // USDT to swap
 
-        // Swap half to DAI
-        IERC20(USDT).approve(s_V2Router02Address, netSwapAmount);
+        IERC20(USDT).approve(s_V2Router02Address, netSwap);
         uint[] memory amounts = IV2Router02(s_V2Router02Address).swapExactTokensForTokens(
-            netSwapAmount,
+            netSwap,
             _amountOutMin,
             _path,
             address(this),
             _deadline
         );
-        uint256 swappedAmount = amounts[amounts.length - 1];
+        uint256 swappedDAI = amounts[amounts.length - 1];
 
-        // Send fee from the USDT we already hold
         IERC20(USDT).safeTransfer(s_FeeReceiver, fee);
         s_totalFeeReceived += fee;
 
-        // Now add liquidity with the remaining USDT and the swapped DAI
-        uint256 usdtLiquidity = half; // the other half
-        IERC20(USDT).approve(s_V2Router02Address, usdtLiquidity);
-        IERC20(DAI).approve(s_V2Router02Address, swappedAmount);
+        uint256 usdtForLP = half;
+
+        IERC20(USDT).approve(s_V2Router02Address, usdtForLP);
+        IERC20(DAI).approve(s_V2Router02Address, swappedDAI);
 
         (,, uint256 lpTokenAmount) = IV2Router02(s_V2Router02Address).addLiquidity(
             USDT,
             DAI,
-            usdtLiquidity,
-            swappedAmount,
+            usdtForLP,
+            swappedDAI,
             _amountAMin,
             _amountBMin,
-            msg.sender,
+            msg.sender,    // LP tokens go directly to user
             _deadline
         );
 
@@ -103,11 +101,28 @@ contract SwapApp {
         return lpTokenAmount;
     }
 
-    function removeLiquidity(uint256 _liquidityAmount, uint256 _amountAMin, uint256 _amountBMin, address _to, uint256 _deadline) external {
+    function removeLiquidity(
+        uint256 _liquidityAmount,
+        uint256 _amountAMin,
+        uint256 _amountBMin,
+        address _to,
+        uint256 _deadline
+    ) external {
         address lpTokenAddress = IFactory(s_UniswapFactoryAddress).getPair(USDT, DAI);
 
+        // Pull LP tokens from caller
+        IERC20(lpTokenAddress).safeTransferFrom(msg.sender, address(this), _liquidityAmount);
         IERC20(lpTokenAddress).approve(s_V2Router02Address, _liquidityAmount);
-        IV2Router02(s_V2Router02Address).removeLiquidity(USDT, DAI, _liquidityAmount, _amountAMin, _amountBMin, _to, _deadline);
+
+        IV2Router02(s_V2Router02Address).removeLiquidity(
+            USDT,
+            DAI,
+            _liquidityAmount,
+            _amountAMin,
+            _amountBMin,
+            _to,
+            _deadline
+        );
     }
 
     function getTotalFeeReceived() external view returns(uint256 totalFeeReceived) {

@@ -8,6 +8,7 @@ import {Test, console2} from "forge-std/Test.sol";
 import {SwapApp} from "../src/SwapApp.sol";
 import {SwapAppScript} from "../script/SwapAppScript.s.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IFactory} from "../src/IFactory.sol";
 
 contract SwapAppTest is Test {
     SwapApp public swapApp;
@@ -69,41 +70,56 @@ contract SwapAppTest is Test {
     }
 
     function testAddLiquidityCorrectly() public {
-        vm.startPrank(user);
-        uint256 _amountIn = 6e6;
-        uint256 _amountOutMin = 2e18;
-        address[] memory _path; // new address[](2)
-        _path[0] = swapApp.USDT();
-        _path[1] = swapApp.DAI();
-        uint _amountAMin = 0;
-        uint _amountBMin = 0;
+        uint256 _amountIn = 200 * 1e6;             // 2000 USDT
+        uint256 _amountOutMin = 50 * 1e18;        // ~1900 DAI (very safe)
+        address[] memory _path = new address[](2);
+        _path[0] = USDT;
+        _path[1] = DAI;
         uint _deadline = block.timestamp + 4 minutes;
+
+        vm.startPrank(user);
         IERC20(USDT).approve(address(swapApp), _amountIn);
-        swapApp.addLiquidity(_amountIn, _amountOutMin, _path, _amountAMin, _amountBMin, _deadline);
+        uint256 lp = swapApp.addLiquidity(
+            _amountIn,
+            _amountOutMin,
+            _path,
+            0,          // _amountAMin
+            0,          // _amountBMin
+            _deadline
+        );
+        console2.log("LP minted:", lp);
+        assertGt(lp, 0);
         vm.stopPrank();
     }
 
     function testRemoveLiquidity() public {
-        vm.startPrank(user);
-        uint256 _amountIn = 6e6;
-        uint256 _amountOutMin = 2e18;
-        address[] memory _path; // new address[](2)
-        _path[0] = swapApp.USDT();
-        _path[1] = swapApp.DAI();
-        uint _amountAMin = 0;
-        uint _amountBMin = 0;
-        uint _deadline = block.timestamp + 4 minutes;
-        IERC20(USDT).approve(address(swapApp), _amountIn);
-        uint256 lpTokens = swapApp.addLiquidity(_amountIn, _amountOutMin, _path, _amountAMin, _amountBMin, _deadline);
-        vm.stopPrank();
+        // 1. Add liquidity first
+        uint256 addAmount = 2000 * 1e6;
+        address[] memory path = new address[](2);
+        path[0] = USDT;
+        path[1] = DAI;
+        uint256 deadline = block.timestamp + 4 minutes;
 
         vm.startPrank(user);
-        uint256 _liquidityAmount = lpTokens;
-        uint256 amountAMin = _amountIn / 2;
-        uint256 amountBMin = amountAMin;
-        uint deadline = block.timestamp + 4 minutes;
-        swapApp.removeLiquidity(_liquidityAmount, amountAMin, amountBMin, msg.sender, deadline);
+        IERC20(USDT).approve(address(swapApp), addAmount);
+        uint256 lpTokens = swapApp.addLiquidity(addAmount, 700 * 1e18, path, 0, 0, deadline);
+        require(lpTokens > 0, "Add liquidity failed");
         vm.stopPrank();
 
-    }    
+        // 2. Approve LP token for removal
+        address lpTokenAddress = IFactory(swapApp.s_UniswapFactoryAddress()).getPair(USDT, DAI);
+        vm.prank(user);
+        IERC20(lpTokenAddress).approve(address(swapApp), lpTokens);
+
+        // 3. Remove liquidity
+        vm.startPrank(user);
+        uint256 minUSDT = 900 * 1e6;   // ~ half of 2000 USDT minus small fee
+        uint256 minDAI  = 700 * 1e18;
+        swapApp.removeLiquidity(lpTokens, minUSDT, minDAI, user, deadline);
+        vm.stopPrank();
+
+        // After removal, user should have received both tokens
+        assertGt(IERC20(USDT).balanceOf(user), 0);
+        assertGt(IERC20(DAI).balanceOf(user), 0);
+    }
 }
