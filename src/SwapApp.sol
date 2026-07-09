@@ -31,6 +31,14 @@ contract SwapApp {
         DAI = _dai;
     }
 
+    /**
+     * @dev Swap tokens
+     * @param _amountIn Amount in
+     * @param _amountOutMin Minimum amount out
+     * @param _path Array of token addresses
+     * @param _to address to send swapped token
+     * @param _deadline Time allowed to expect for the swap
+     */
     function swapTokens(uint256 _amountIn, uint256 _amountOutMin, address[] memory _path, address _to, uint256 _deadline) public returns(uint256) {
         
         uint256 fee = (_amountIn * getFeeBasisPoints()) / getPercentageBasis();
@@ -53,6 +61,16 @@ contract SwapApp {
 
     }
 
+    /**
+     * 
+     * @param _amountIn Amount in
+     * @param _amountOutMin Minimum amount out
+     * @param _path Array of addresses of tokens
+     * @param _amountAMin Minimum amount of token A
+     * @param _amountBMin Minimum amount of token B
+     * @param _deadline Time allowed to expect for the transaction
+     * @return amount Amount of lp tokens
+     */
     function addLiquidity(
         uint256 _amountIn,
         uint256 _amountOutMin,
@@ -101,6 +119,14 @@ contract SwapApp {
         return lpTokenAmount;
     }
 
+    /**
+     * @dev Remove liquidity
+     * @param _liquidityAmount Liquidity amount
+     * @param _amountAMin Minimum amount token A
+     * @param _amountBMin Minimum amount token B
+     * @param _to Address to receive tokens
+     * @param _deadline Time allowed to expect for the transaction
+     */
     function removeLiquidity(
         uint256 _liquidityAmount,
         uint256 _amountAMin,
@@ -125,14 +151,26 @@ contract SwapApp {
         );
     }
 
+    /**
+     * @dev Get the total fee received
+     * @return totalFeeReceived Total fee received
+     */
     function getTotalFeeReceived() external view returns(uint256 totalFeeReceived) {
         totalFeeReceived = s_totalFeeReceived;
     }
 
+    /**
+     * @dev get the fee Basis Points for the operation %
+     * @return feeBasisPoints Fee basis points
+     */
     function getFeeBasisPoints() public view returns(uint256 feeBasisPoints) {
         feeBasisPoints = s_feeBasisPoints;
     }
 
+    /**
+     * @dev Get the Percentage Basis
+     * @return percentageBasis Percentage Basis
+     */
     function getPercentageBasis() public pure returns(uint256 percentageBasis) {
         percentageBasis = PERCENTAGE_BASIS;
     }
