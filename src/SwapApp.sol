@@ -6,6 +6,11 @@ import {IFactory} from "./IFactory.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+/**
+ * @title Swap App Liquidity Pool
+ * @author Carlos Gutiérrez
+ * @notice Swap app with liquidity pool
+ */
 contract SwapApp {
 
     using SafeERC20 for IERC20;
